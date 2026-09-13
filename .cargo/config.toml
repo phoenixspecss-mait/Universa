@@ -1,0 +1,3 @@
+[env]
+PKG_CONFIG_PATH = { value = "/opt/homebrew/opt/ffmpeg@7/lib/pkgconfig", force = true }
+BINDGEN_EXTRA_CLANG_ARGS = { value = "-I/opt/homebrew/opt/ffmpeg@7/include", force = true }
