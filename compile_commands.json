@@ -1,0 +1,42 @@
+[
+  {
+    "directory": "/Users/yashmalhotra/Documents/Universa",
+    "command": "/usr/bin/clang++ -std=c++17 -Ibackend -Ibackend/api -I/opt/homebrew/opt/openssl/include -I/opt/homebrew/opt/ffmpeg/include -c backend/detect.c++ -o detect.o",
+    "file": "backend/detect.c++"
+  },
+  {
+    "directory": "/Users/yashmalhotra/Documents/Universa",
+    "command": "/usr/bin/clang++ -std=c++17 -Ibackend -Ibackend/api -I/opt/homebrew/opt/openssl/include -I/opt/homebrew/opt/ffmpeg/include -c backend/file_carver.cpp -o file_carver.o",
+    "file": "backend/file_carver.cpp"
+  },
+  {
+    "directory": "/Users/yashmalhotra/Documents/Universa",
+    "command": "/usr/bin/clang++ -std=c++17 -Ibackend -Ibackend/api -I/opt/homebrew/opt/openssl/include -I/opt/homebrew/opt/ffmpeg/include -c backend/clip_validator.cpp -o clip_validator.o",
+    "file": "backend/clip_validator.cpp"
+  },
+  {
+    "directory": "/Users/yashmalhotra/Documents/Universa",
+    "command": "/usr/bin/clang++ -std=c++17 -Ibackend -Ibackend/api -I/opt/homebrew/opt/openssl/include -I/opt/homebrew/opt/ffmpeg/include -c backend/custody_log.cpp -o custody_log.o",
+    "file": "backend/custody_log.cpp"
+  },
+  {
+    "directory": "/Users/yashmalhotra/Documents/Universa",
+    "command": "/usr/bin/clang++ -std=c++17 -Ibackend -Ibackend/api -I/opt/homebrew/opt/openssl/include -I/opt/homebrew/opt/ffmpeg/include -c backend/timeline_normalizer.cpp -o timeline_normalizer.o",
+    "file": "backend/timeline_normalizer.cpp"
+  },
+  {
+    "directory": "/Users/yashmalhotra/Documents/Universa",
+    "command": "/usr/bin/clang++ -std=c++17 -Ibackend -Ibackend/api -I/opt/homebrew/opt/openssl/include -I/opt/homebrew/opt/ffmpeg/include -c backend/report_generator.cpp -o report_generator.o",
+    "file": "backend/report_generator.cpp"
+  },
+  {
+    "directory": "/Users/yashmalhotra/Documents/Universa",
+    "command": "/usr/bin/clang++ -std=c++17 -Ibackend -Ibackend/api -I/opt/homebrew/opt/openssl/include -I/opt/homebrew/opt/ffmpeg/include -c backend/synthetic_image_builder.cpp -o synthetic_image_builder.o",
+    "file": "backend/synthetic_image_builder.cpp"
+  },
+  {
+    "directory": "/Users/yashmalhotra/Documents/Universa",
+    "command": "/usr/bin/clang++ -std=c++17 -Ibackend -Ibackend/api -I/opt/homebrew/opt/openssl/include -I/opt/homebrew/opt/ffmpeg/include -c backend/api/api_server.cpp -o api_server.o",
+    "file": "backend/api/api_server.cpp"
+  }
+]
