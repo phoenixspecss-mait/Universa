@@ -7,6 +7,7 @@
 #include <chrono>
 #include <iomanip>
 #include <vector>
+#include <thread>
 #include "file_carver.h"
 #include "clip_validator.h"
 #include "custody_log.h"
@@ -268,6 +269,16 @@ static std::string processSingleFile(const std::string& caseId,
              << "  \"chain_verified\": " << (chainOk ? "true" : "false") << "\n"
              << "}\n";
 
+    // Interconnect: asynchronously notify Python Timeline & ML Engine (port 8000)
+    std::thread([caseId]() {
+        try {
+            httplib::Client cli("127.0.0.1", 8000);
+            cli.set_connection_timeout(1, 0);
+            cli.set_read_timeout(15, 0);
+            cli.Post(("/api/v1/cases/" + caseId + "/process-carved").c_str(), "", "application/json");
+        } catch (...) {}
+    }).detach();
+
     std::string jsonContent = readFileContents(jsonPath);
     if (!jsonContent.empty() && jsonContent.front() == '{') {
         std::string inject = "{\n  \"case_id\": \"" + caseId + "\",\n";
@@ -373,6 +384,54 @@ int main(int argc, char* argv[]) {
             return;
         }
         res.set_content(readFileContents(p.string()), "application/json");
+    });
+
+    svr.Get(R"(/api/cases/([^/]+)/ml_summary)", [applyCors](const httplib::Request& req, httplib::Response& res) {
+        applyCors(req, res);
+        std::string caseId = req.matches[1];
+        fs::path p = fs::path("cases") / caseId / "universa_ml_summary.json";
+        if (!fs::exists(p)) {
+            p = fs::path("cases") / caseId / "ai_summary.json";
+        }
+        if (!fs::exists(p)) {
+            res.status = 404;
+            res.set_content("{}", "application/json");
+            return;
+        }
+        res.set_content(readFileContents(p.string()), "application/json");
+    });
+
+    svr.Get(R"(/api/cases/([^/]+)/timeline)", [applyCors](const httplib::Request& req, httplib::Response& res) {
+        applyCors(req, res);
+        std::string caseId = req.matches[1];
+        try {
+            httplib::Client cli("127.0.0.1", 8000);
+            cli.set_connection_timeout(1, 0);
+            cli.set_read_timeout(5, 0);
+            auto resp = cli.Get(("/api/v1/timeline/" + caseId).c_str());
+            if (resp && resp->status == 200) {
+                res.set_content(resp->body, "application/json");
+                return;
+            }
+        } catch (...) {}
+        res.status = 404;
+        res.set_content("{\"events\":[]}", "application/json");
+    });
+
+    svr.Get("/api/search", [applyCors](const httplib::Request& req, httplib::Response& res) {
+        applyCors(req, res);
+        std::string q = req.has_param("q") ? req.get_param_value("q") : "";
+        try {
+            httplib::Client cli("127.0.0.1", 8000);
+            cli.set_connection_timeout(1, 0);
+            cli.set_read_timeout(5, 0);
+            auto resp = cli.Get(("/api/v1/search?q=" + httplib::encode_uri(q)).c_str());
+            if (resp && resp->status == 200) {
+                res.set_content(resp->body, "application/json");
+                return;
+            }
+        } catch (...) {}
+        res.set_content("[]", "application/json");
     });
 
     svr.Get(R"(/api/cases/([^/]+)/report\.json)", [applyCors](const httplib::Request& req, httplib::Response& res) {

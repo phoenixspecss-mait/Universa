@@ -1,0 +1,251 @@
+{
+  "case": {
+    "case_id": "CASE-2026-09-NTRO",
+    "case_number": "NTRO-FIR-2026-0042",
+    "title": "Operation NightWatch: Multi-Vendor DVR Forensic Extraction",
+    "description": "Cross-camera incident reconstruction from 5 seized surveillance systems."
+  },
+  "cameras": [
+    {
+      "channel_id": "CAM01",
+      "name": "Main Entrance Gate",
+      "vendor_type": "HIKVISION",
+      "location": "Building A North Gate",
+      "clock_offset_ms": -5000.0,
+      "drift_rate_ppm": 0.0,
+      "timezone": "UTC"
+    },
+    {
+      "channel_id": "CAM02",
+      "name": "Reception Lobby",
+      "vendor_type": "DAHUA",
+      "location": "Building A Ground Floor Lobby",
+      "clock_offset_ms": 0.0,
+      "drift_rate_ppm": 0.0,
+      "timezone": "Asia/Kolkata"
+    },
+    {
+      "channel_id": "CAM03",
+      "name": "Parking Lot East",
+      "vendor_type": "UNV",
+      "location": "Open Parking Lot Bay 3",
+      "clock_offset_ms": 0.0,
+      "drift_rate_ppm": 0.0,
+      "timezone": "UTC"
+    },
+    {
+      "channel_id": "CAM04",
+      "name": "Server Room Corridor",
+      "vendor_type": "CP_PLUS",
+      "location": "Basement Critical Infrastructure",
+      "clock_offset_ms": 0.0,
+      "drift_rate_ppm": 0.0,
+      "timezone": "UTC"
+    },
+    {
+      "channel_id": "CAM05",
+      "name": "Perimeter South Fence",
+      "vendor_type": "FAT_FS",
+      "location": "Outer Boundary Gate 4",
+      "clock_offset_ms": 0.0,
+      "drift_rate_ppm": 0.0,
+      "timezone": "UTC"
+    }
+  ],
+  "corrections": [
+    {
+      "case_id": "CASE-2026-09-NTRO",
+      "channel_id": "CAM01",
+      "applied_offset_ms": -5000.0,
+      "correction_method": "FIXED_OFFSET",
+      "drift_rate_ppm": 0.0,
+      "reason": "Hardware RTC was 5.0 seconds fast compared to GPS master reference",
+      "source": "Physical Inspection Log / GPS Beacon Sync"
+    }
+  ],
+  "raw_frames": [
+    {
+      "case_id": "CASE-2026-09-NTRO",
+      "evidence_id": "EVD-HIK-01",
+      "channel_id": "CAM01",
+      "vendor_type": "HIKVISION",
+      "raw_timestamp_str": "20260310T120005Z",
+      "timestamp_format": "VENDOR_HIKVISION",
+      "timestamp_source": "RECORDING_EMBEDDED",
+      "timezone": "UTC",
+      "frame_index": 101,
+      "file_offset_bytes": 1048576,
+      "pts": 101000,
+      "dts": 101000,
+      "file_path": "/evidence/cam01/stream.hik",
+      "frame_hash_sha256": "4a5e1e5823a04e5fbc089851613b5e4f451f28b2de5d8e780c85c2c776fb0821"
+    },
+    {
+      "case_id": "CASE-2026-09-NTRO",
+      "evidence_id": "EVD-DAH-02",
+      "channel_id": "CAM02",
+      "vendor_type": "DAHUA",
+      "raw_timestamp_str": "2026-03-10 17:30:03.000",
+      "timestamp_format": "VENDOR_DAHUA",
+      "timestamp_source": "RECORDING_EMBEDDED",
+      "timezone": "Asia/Kolkata",
+      "frame_index": 205,
+      "file_offset_bytes": 2097152,
+      "pts": 205000,
+      "dts": 205000,
+      "file_path": "/evidence/cam02/stream.dav",
+      "frame_hash_sha256": "8a32bc3e7a02c89f5bc39e144a1945110d7a049e29fba900fa26e4e69b9f91a5"
+    },
+    {
+      "case_id": "CASE-2026-09-NTRO",
+      "evidence_id": "EVD-UNV-03",
+      "channel_id": "CAM03",
+      "vendor_type": "UNV",
+      "raw_timestamp_str": "1773144015000",
+      "timestamp_format": "UNIX_EPOCH_MS",
+      "timestamp_source": "RECORDING_EMBEDDED",
+      "timezone": "UTC",
+      "frame_index": 310,
+      "file_offset_bytes": 3145728,
+      "pts": 310000,
+      "dts": 310000,
+      "file_path": "/evidence/cam03/stream.mp4",
+      "frame_hash_sha256": "3ef91c89012a95c80a2b84ef678d91a92bf98305c7438ea120387401d8e123fa"
+    },
+    {
+      "case_id": "CASE-2026-09-NTRO",
+      "evidence_id": "EVD-CP-04",
+      "channel_id": "CAM04",
+      "vendor_type": "CP_PLUS",
+      "raw_timestamp_str": "2026-03-10T12:00:20Z",
+      "timestamp_format": "ISO_8601",
+      "timestamp_source": "RECORDING_EMBEDDED",
+      "timezone": "UTC",
+      "frame_index": 401,
+      "file_offset_bytes": 4194304,
+      "pts": 401000,
+      "dts": 401000,
+      "file_path": "/evidence/cam04/stream.asf",
+      "frame_hash_sha256": "91a82f3c09b1a7d2e3f405869a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b"
+    },
+    {
+      "case_id": "CASE-2026-09-NTRO",
+      "evidence_id": "EVD-CP-04",
+      "channel_id": "CAM04",
+      "vendor_type": "CP_PLUS",
+      "raw_timestamp_str": "2026-03-10T12:00:18Z",
+      "timestamp_format": "ISO_8601",
+      "timestamp_source": "RECORDING_EMBEDDED",
+      "timezone": "UTC",
+      "frame_index": 402,
+      "file_offset_bytes": 4200000,
+      "pts": 402000,
+      "dts": 402000,
+      "file_path": "/evidence/cam04/stream.asf",
+      "frame_hash_sha256": "5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+    },
+    {
+      "case_id": "CASE-2026-09-NTRO",
+      "evidence_id": "EVD-CP-04",
+      "channel_id": "CAM04",
+      "vendor_type": "CP_PLUS",
+      "raw_timestamp_str": "2026-03-10T12:01:10Z",
+      "timestamp_format": "ISO_8601",
+      "timestamp_source": "RECORDING_EMBEDDED",
+      "timezone": "UTC",
+      "frame_index": 403,
+      "file_offset_bytes": 4300000,
+      "pts": 403000,
+      "dts": 403000,
+      "file_path": "/evidence/cam04/stream.asf",
+      "frame_hash_sha256": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b"
+    },
+    {
+      "case_id": "CASE-2026-09-NTRO",
+      "evidence_id": "EVD-FAT-05",
+      "channel_id": "CAM05",
+      "vendor_type": "FAT_FS",
+      "raw_timestamp_str": "2026-03-10 12:00:17",
+      "timestamp_format": "VENDOR_DAHUA",
+      "timestamp_source": "FAT_DIRENTRY",
+      "timezone": "UTC",
+      "frame_index": 501,
+      "file_offset_bytes": 5242880,
+      "pts": 501000,
+      "dts": 501000,
+      "file_path": "/evidence/cam05/FAT_CLUSTER_0412.raw",
+      "frame_hash_sha256": "7f8e9d0c1b2a3f4e5d6c7b8a9f0e1d2c3b4a5f6e7d8c9b0a1f2e3d4c5b6a7f8e"
+    }
+  ],
+  "ai_detections": [
+    {
+      "case_id": "CASE-2026-09-NTRO",
+      "evidence_id": "EVD-HIK-01",
+      "channel_id": "CAM01",
+      "utc_timestamp": "2026-03-10T12:00:00Z",
+      "frame_index": 101,
+      "object_class": "person",
+      "confidence": 0.945,
+      "bounding_box": { "xmin": 0.22, "ymin": 0.15, "xmax": 0.45, "ymax": 0.88 },
+      "track_id": "local_trk_101",
+      "is_global_track_id": false,
+      "embedding": [0.088, -0.124, 0.452, 0.219, -0.055, 0.312, -0.188, 0.274],
+      "detection_metadata": { "model": "YOLOv10x", "zone": "North_Turnstile" }
+    },
+    {
+      "case_id": "CASE-2026-09-NTRO",
+      "evidence_id": "EVD-DAH-02",
+      "channel_id": "CAM02",
+      "utc_timestamp": "2026-03-10T12:00:03Z",
+      "frame_index": 205,
+      "object_class": "person",
+      "confidence": 0.912,
+      "bounding_box": { "xmin": 0.35, "ymin": 0.18, "xmax": 0.58, "ymax": 0.91 },
+      "track_id": "local_trk_205",
+      "is_global_track_id": false,
+      "embedding": [0.091, -0.120, 0.449, 0.215, -0.052, 0.310, -0.185, 0.270],
+      "detection_metadata": { "model": "YOLOv10x", "zone": "Lobby_Reception" }
+    },
+    {
+      "case_id": "CASE-2026-09-NTRO",
+      "evidence_id": "EVD-UNV-03",
+      "channel_id": "CAM03",
+      "utc_timestamp": "2026-03-10T12:00:15Z",
+      "frame_index": 310,
+      "object_class": "car",
+      "confidence": 0.895,
+      "bounding_box": { "xmin": 0.12, "ymin": 0.45, "xmax": 0.78, "ymax": 0.92 },
+      "track_id": "local_trk_310",
+      "is_global_track_id": false,
+      "embedding": [0.35, 0.12, -0.05, 0.82, -0.11, 0.05, 0.22, -0.15],
+      "detection_metadata": { "model": "YOLOv10x", "license_plate_hint": "DL-01-AB-1234" }
+    },
+    {
+      "case_id": "CASE-2026-09-NTRO",
+      "evidence_id": "EVD-FAT-05",
+      "channel_id": "CAM05",
+      "utc_timestamp": "2026-03-10T12:00:17Z",
+      "frame_index": 501,
+      "object_class": "car",
+      "confidence": 0.884,
+      "bounding_box": { "xmin": 0.15, "ymin": 0.42, "xmax": 0.81, "ymax": 0.90 },
+      "track_id": "local_trk_501",
+      "is_global_track_id": false,
+      "embedding": [0.34, 0.13, -0.06, 0.81, -0.10, 0.06, 0.21, -0.14],
+      "detection_metadata": { "model": "YOLOv10x", "zone": "Outer_Gate_South" }
+    },
+    {
+      "case_id": "CASE-2026-09-NTRO",
+      "evidence_id": "EVD-CP-04",
+      "channel_id": "CAM04",
+      "utc_timestamp": "2026-03-10T12:01:10Z",
+      "frame_index": 403,
+      "object_class": "backpack",
+      "confidence": 0.792,
+      "bounding_box": { "xmin": 0.40, "ymin": 0.60, "xmax": 0.55, "ymax": 0.80 },
+      "track_id": "local_trk_403",
+      "is_global_track_id": false,
+      "detection_metadata": { "model": "YOLOv10x", "status": "unattended_object" }
+    }
+  ]
+}

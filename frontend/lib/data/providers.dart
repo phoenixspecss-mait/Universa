@@ -52,14 +52,52 @@ final dashboardStatsProvider = Provider<Map<String, dynamic>>((ref) {
 
 final searchQueryProvider = StateProvider<String>((ref) => '');
 
+class SearchResultsNotifier extends StateNotifier<List<SearchResultModel>> {
+  SearchResultsNotifier(this._client) : super(MockData.searchResults);
+
+  final ApiClient _client;
+  String _lastQuery = '';
+
+  Future<void> search(String query) async {
+    if (query == _lastQuery) return;
+    _lastQuery = query;
+
+    if (query.trim().isEmpty) {
+      state = MockData.searchResults;
+      return;
+    }
+
+    try {
+      final liveResults = await _client.searchSemantic(query);
+      if (liveResults.isNotEmpty) {
+        state = liveResults;
+        return;
+      }
+    } catch (_) {}
+
+    // Graceful fallback to client-side filtering if server is offline
+    state = MockData.searchResults.where((r) =>
+      r.description.toLowerCase().contains(query.toLowerCase()) ||
+      r.cameraName.toLowerCase().contains(query.toLowerCase()) ||
+      r.objectType.toLowerCase().contains(query.toLowerCase())
+    ).toList();
+  }
+}
+
+final searchResultsNotifierProvider =
+    StateNotifierProvider<SearchResultsNotifier, List<SearchResultModel>>((ref) {
+  final client = ref.watch(apiClientProvider);
+  final notifier = SearchResultsNotifier(client);
+
+  ref.listen<String>(searchQueryProvider, (_, next) {
+    notifier.search(next);
+  });
+
+  return notifier;
+});
+
 final searchResultsProvider = Provider<List<SearchResultModel>>((ref) {
-  final query = ref.watch(searchQueryProvider);
-  if (query.isEmpty) return MockData.searchResults;
-  return MockData.searchResults.where((r) =>
-    r.description.toLowerCase().contains(query.toLowerCase()) ||
-    r.cameraName.toLowerCase().contains(query.toLowerCase()) ||
-    r.objectType.toLowerCase().contains(query.toLowerCase())
-  ).toList();
+  return ref.watch(searchResultsNotifierProvider);
 });
 
 // ──────────────────────────── Report ─────────────────────────────
@@ -96,3 +134,35 @@ final uploadProvider =
     StateNotifierProvider<UploadNotifier, UploadState>((ref) {
   return UploadNotifier(ref.watch(apiClientProvider));
 });
+
+// ──────────────────────────── Timeline & Correlation ─────────────
+
+final timelineEventsProvider =
+    FutureProvider.family<Map<String, dynamic>, String>((ref, caseId) async {
+  try {
+    final client = ref.watch(apiClientProvider);
+    return await client.fetchTimeline(caseId);
+  } catch (_) {
+    return {'events': [], 'total_events': 0};
+  }
+});
+
+final correlationsProvider =
+    FutureProvider.family<List<dynamic>, String>((ref, caseId) async {
+  try {
+    final client = ref.watch(apiClientProvider);
+    return await client.fetchCorrelations(caseId);
+  } catch (_) {
+    return [];
+  }
+});
+
+final pipelineStatusProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  try {
+    final client = ref.watch(apiClientProvider);
+    return await client.fetchPipelineStatus();
+  } catch (_) {
+    return {'is_healthy': false};
+  }
+});
+

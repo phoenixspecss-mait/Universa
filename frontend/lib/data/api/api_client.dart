@@ -4,13 +4,16 @@ import 'package:http/http.dart' as http;
 import 'package:universa/data/models/case_model.dart';
 import 'package:universa/data/models/report_model.dart';
 import 'package:universa/data/models/ai_detection_model.dart';
+import 'package:universa/data/models/search_result_model.dart';
 
-/// HTTP client for the UNIVERSA C++ backend API (default: http://localhost:8080).
+/// HTTP client for UNIVERSA C++ backend (port 8080) and Timeline/ML Engine (port 8000).
 class ApiClient {
-  ApiClient({String? baseUrl})
-      : _base = Uri.parse(baseUrl ?? 'http://localhost:8080');
+  ApiClient({String? baseUrl, String? timelineBaseUrl})
+      : _base = Uri.parse(baseUrl ?? 'http://localhost:8080'),
+        _timelineBase = Uri.parse(timelineBaseUrl ?? 'http://localhost:8000/api/v1');
 
   final Uri _base;
+  final Uri _timelineBase;
   final _client = http.Client();
 
   // ─────────────────────────── Cases ──────────────────────────────
@@ -67,6 +70,103 @@ class ApiClient {
     final response = await _client.get(uri).timeout(const Duration(seconds: 10));
     _assertOk(response, uri);
     return response.body;
+  }
+
+  // ─────────────────────────── Semantic Search & Timeline ──────────
+
+  /// Executes natural language semantic search across multi-camera feeds.
+  /// First tries Python Timeline/ML Engine (:8000), then falls back to C++ server proxy (:8080).
+  Future<List<SearchResultModel>> searchSemantic(
+    String query, {
+    String? caseId,
+    int topK = 10,
+  }) async {
+    // 1. Try direct Timeline / ML Engine at port 8000
+    try {
+      final uri = _timelineBase.replace(path: '/api/v1/search/semantic');
+      final response = await _client
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'query': query,
+              'case_id': caseId,
+              'top_k': topK,
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final list = jsonDecode(response.body) as List<dynamic>;
+        return list
+            .map((e) => SearchResultModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+    } catch (_) {
+      // Best effort fallback to C++ server proxy
+    }
+
+    // 2. Try C++ proxy at port 8080
+    try {
+      final uri = _base.replace(
+        path: '/api/search',
+        queryParameters: {'q': query},
+      );
+      final response = await _client.get(uri).timeout(const Duration(seconds: 5));
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final list = jsonDecode(response.body) as List<dynamic>;
+        return list
+            .map((e) => SearchResultModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+    } catch (_) {}
+
+    return [];
+  }
+
+  /// Fetches unified chronological timeline events for a case.
+  Future<Map<String, dynamic>> fetchTimeline(String caseId) async {
+    try {
+      final uri = _timelineBase.replace(path: '/api/v1/timeline/$caseId');
+      final response = await _client.get(uri).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+    } catch (_) {
+      // Try C++ server proxy
+      try {
+        final uri = _base.replace(path: '/api/cases/$caseId/timeline');
+        final response = await _client.get(uri).timeout(const Duration(seconds: 5));
+        if (response.statusCode == 200) {
+          return jsonDecode(response.body) as Map<String, dynamic>;
+        }
+      } catch (_) {}
+    }
+    return {'events': [], 'total_events': 0};
+  }
+
+  /// Fetches cross-camera sliding window correlations.
+  Future<List<dynamic>> fetchCorrelations(String caseId) async {
+    try {
+      final uri = _timelineBase.replace(path: '/api/v1/correlations/$caseId');
+      final response = await _client.get(uri).timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as List<dynamic>;
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  /// Fetches pipeline ingestion health and throughput.
+  Future<Map<String, dynamic>> fetchPipelineStatus() async {
+    try {
+      final uri = _timelineBase.replace(path: '/api/v1/pipeline/status');
+      final response = await _client.get(uri).timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return {'is_healthy': false};
   }
 
   // ─────────────────────────── Upload ─────────────────────────────

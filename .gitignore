@@ -1,3 +1,30 @@
 /target
 /sample.mp4
 .DS_Store
+
+# Build artifacts and binaries
+*.o
+*.so
+*.dylib
+*.a
+dvr_api_server
+dvr_recovery
+synthetic_image_builder
+/models/
+
+# Database & forensic logs
+*.db
+*.db-shm
+*.db-wal
+output/
+cases/
+synthetic_disk.img
+
+# Python & environments
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+env/
+venv/

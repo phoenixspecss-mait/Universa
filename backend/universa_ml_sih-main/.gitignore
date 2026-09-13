@@ -1,0 +1,22 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Model weights (large, auto-downloaded)
+models/weights/
+*.pt
+*.caffemodel
+*.prototxt
+
+# Outputs and test data (can be large/regenerable)
+output/*.json
+sample_data/*.mp4
+sample_data/*.mov
+
+# Keep folder structure
+!output/.gitkeep
+!sample_data/.gitkeep
+
+# OS junk
+.DS_Store
