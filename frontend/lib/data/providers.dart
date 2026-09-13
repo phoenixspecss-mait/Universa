@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:universa/data/models/case_model.dart';
 import 'package:universa/data/models/search_result_model.dart';
@@ -6,6 +7,9 @@ import 'package:universa/data/models/ai_detection_model.dart';
 import 'package:universa/data/api/api_client.dart';
 import 'package:universa/data/api/upload_notifier.dart';
 import 'package:universa/data/mock_data.dart';
+
+/// Configurable demo flag: MockData is ONLY loaded when compiled with `--dart-define=DEMO_MODE=true`
+const bool _isDemoMode = bool.fromEnvironment('DEMO_MODE', defaultValue: false);
 
 // ──────────────────────────── API ────────────────────────────────
 
@@ -19,14 +23,17 @@ final apiClientProvider = Provider<ApiClient>((ref) {
 // ──────────────────────────── Cases ──────────────────────────────
 
 /// Live case list from `GET /api/cases`.
-/// Falls back to mock data when the server is unreachable.
+/// Throws AsyncError when backend is offline unless DEMO_MODE is active.
 final casesProvider = FutureProvider<List<CaseModel>>((ref) async {
   try {
     final client = ref.watch(apiClientProvider);
     return await client.fetchCases();
-  } catch (_) {
-    // Graceful fallback so the app still works without a running server.
-    return MockData.cases;
+  } catch (e) {
+    if (_isDemoMode) {
+      debugPrint('[DEMO MODE] Using mock cases due to error: $e');
+      return MockData.cases;
+    }
+    rethrow;
   }
 });
 
@@ -43,8 +50,20 @@ final dashboardStatsProvider = Provider<Map<String, dynamic>>((ref) {
       'pendingAiTriage': cases.where((c) => c.status == CaseStatus.aiTriage).length,
       'hashVerifiedCases': cases.where((c) => c.status == CaseStatus.hashVerified).length,
     },
-    loading: () => MockData.dashboardStats,
-    error: (_, __) => MockData.dashboardStats,
+    loading: () => {
+      'activeCases': 0,
+      'avgExtractionTime': '—',
+      'avgExtractionProgress': 0.0,
+      'pendingAiTriage': 0,
+      'hashVerifiedCases': 0,
+    },
+    error: (e, st) => {
+      'activeCases': 0,
+      'avgExtractionTime': 'ERR',
+      'avgExtractionProgress': 0.0,
+      'pendingAiTriage': 0,
+      'hashVerifiedCases': 0,
+    },
   );
 });
 
@@ -53,7 +72,7 @@ final dashboardStatsProvider = Provider<Map<String, dynamic>>((ref) {
 final searchQueryProvider = StateProvider<String>((ref) => '');
 
 class SearchResultsNotifier extends StateNotifier<List<SearchResultModel>> {
-  SearchResultsNotifier(this._client) : super(MockData.searchResults);
+  SearchResultsNotifier(this._client) : super(_isDemoMode ? MockData.searchResults : const []);
 
   final ApiClient _client;
   String _lastQuery = '';
@@ -63,24 +82,25 @@ class SearchResultsNotifier extends StateNotifier<List<SearchResultModel>> {
     _lastQuery = query;
 
     if (query.trim().isEmpty) {
-      state = MockData.searchResults;
+      state = _isDemoMode ? MockData.searchResults : const [];
       return;
     }
 
     try {
       final liveResults = await _client.searchSemantic(query);
-      if (liveResults.isNotEmpty) {
-        state = liveResults;
-        return;
+      state = liveResults;
+    } catch (e) {
+      if (_isDemoMode) {
+        state = MockData.searchResults.where((r) =>
+          r.description.toLowerCase().contains(query.toLowerCase()) ||
+          r.cameraName.toLowerCase().contains(query.toLowerCase()) ||
+          r.objectType.toLowerCase().contains(query.toLowerCase())
+        ).toList();
+      } else {
+        state = const [];
+        rethrow;
       }
-    } catch (_) {}
-
-    // Graceful fallback to client-side filtering if server is offline
-    state = MockData.searchResults.where((r) =>
-      r.description.toLowerCase().contains(query.toLowerCase()) ||
-      r.cameraName.toLowerCase().contains(query.toLowerCase()) ||
-      r.objectType.toLowerCase().contains(query.toLowerCase())
-    ).toList();
+    }
   }
 }
 
@@ -105,13 +125,17 @@ final searchResultsProvider = Provider<List<SearchResultModel>>((ref) {
 final selectedCaseIdProvider = StateProvider<String?>((ref) => null);
 
 /// Live report from `GET /api/cases/:id/report.json`.
-/// Falls back to mock report when server is unreachable.
+/// Propagates errors cleanly as AsyncValue.error.
 final reportProvider = FutureProvider.family<ReportModel, String>((ref, caseId) async {
   try {
     final client = ref.watch(apiClientProvider);
     return await client.fetchReport(caseId);
-  } catch (_) {
-    return MockData.sampleReport;
+  } catch (e) {
+    if (_isDemoMode) {
+      debugPrint('[DEMO MODE] Using mock report: $e');
+      return MockData.sampleReport;
+    }
+    rethrow;
   }
 });
 
@@ -123,8 +147,12 @@ final aiSummaryProvider =
   try {
     final client = ref.watch(apiClientProvider);
     return await client.fetchAiSummary(caseId);
-  } catch (_) {
-    return [];
+  } catch (e) {
+    if (_isDemoMode) {
+      debugPrint('[DEMO MODE] Using empty AI summary fallback: $e');
+      return [];
+    }
+    rethrow;
   }
 });
 
@@ -142,8 +170,11 @@ final timelineEventsProvider =
   try {
     final client = ref.watch(apiClientProvider);
     return await client.fetchTimeline(caseId);
-  } catch (_) {
-    return {'events': [], 'total_events': 0};
+  } catch (e) {
+    if (_isDemoMode) {
+      return {'events': [], 'total_events': 0};
+    }
+    rethrow;
   }
 });
 
@@ -152,8 +183,11 @@ final correlationsProvider =
   try {
     final client = ref.watch(apiClientProvider);
     return await client.fetchCorrelations(caseId);
-  } catch (_) {
-    return [];
+  } catch (e) {
+    if (_isDemoMode) {
+      return [];
+    }
+    rethrow;
   }
 });
 
@@ -161,8 +195,10 @@ final pipelineStatusProvider = FutureProvider<Map<String, dynamic>>((ref) async 
   try {
     final client = ref.watch(apiClientProvider);
     return await client.fetchPipelineStatus();
-  } catch (_) {
-    return {'is_healthy': false};
+  } catch (e) {
+    if (_isDemoMode) {
+      return {'is_healthy': false};
+    }
+    rethrow;
   }
 });
-

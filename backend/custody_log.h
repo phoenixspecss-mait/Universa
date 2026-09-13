@@ -31,6 +31,7 @@ public:
 
     static std::string computeSha256(const std::string& data);
     static std::string computeFileSha256(const std::string& filePath);
+    static std::string computeFileMd5(const std::string& filePath);
 
 private:
     std::string logFilePath;

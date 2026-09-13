@@ -12,6 +12,12 @@ struct ReportData {
     std::string source_file;
     std::string detected_brand;
     std::string source_file_hash;
+    std::string source_file_md5;
+    std::string compliance_standard = "BSA 2023 §63";
+    std::string iso_standard = "ISO/IEC 27037:2012";
+    std::string nist_guideline = "NIST SP 800-86";
+    std::string examiner_name = "Forensic Analyst";
+    std::string organization = "Universa Digital Forensics Lab";
     std::string generated_at_utc;
     bool chain_verification_passed = false;
     int chain_mismatch_index = -1;

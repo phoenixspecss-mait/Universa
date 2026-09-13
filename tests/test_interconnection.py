@@ -18,10 +18,10 @@ from pathlib import Path
 # Add directories to sys.path
 ROOT_DIR = Path(__file__).resolve().parents[1]
 BACKEND_DIR = ROOT_DIR / "backend"
-SOMETHING_DIR = BACKEND_DIR / "something-main"
+TIMELINE_ENGINE_DIR = BACKEND_DIR / "timeline_engine"
 ML_DIR = BACKEND_DIR / "universa_ml_sih-main"
 
-for p in [str(ROOT_DIR), str(SOMETHING_DIR), str(ML_DIR)]:
+for p in [str(ROOT_DIR), str(TIMELINE_ENGINE_DIR), str(ML_DIR)]:
     if p not in sys.path:
         sys.path.insert(0, p)
 

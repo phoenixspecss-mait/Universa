@@ -86,6 +86,12 @@ if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/backend/api/httplib.h")
 endif()
 
 set(COMMON_SOURCES
+    backend/utils.cpp
+    backend/disk_imager.cpp
+    backend/adapters/dahua_adapter.cpp
+    backend/adapters/hikvision_adapter.cpp
+    backend/adapters/generic_mp4_adapter.cpp
+    backend/adapters/adapter_registry.cpp
     backend/file_carver.cpp
     backend/clip_validator.cpp
     backend/custody_log.cpp
@@ -102,6 +108,7 @@ add_executable(dvr_recovery
 target_include_directories(dvr_recovery PRIVATE
     backend
     backend/api
+    backend/adapters
     ${OPENSSL_INCLUDE_DIR}
     ${AVCODEC_INCLUDE_DIRS}
     ${AVFORMAT_INCLUDE_DIRS}
@@ -130,6 +137,7 @@ add_executable(dvr_api_server
 target_include_directories(dvr_api_server PRIVATE
     backend
     backend/api
+    backend/adapters
     ${OPENSSL_INCLUDE_DIR}
     ${AVCODEC_INCLUDE_DIRS}
     ${AVFORMAT_INCLUDE_DIRS}

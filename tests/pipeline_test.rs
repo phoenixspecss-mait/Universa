@@ -51,3 +51,37 @@ fn test_channel_pipeline_handoff() {
     // Verify all 10 frames were handed off properly without data loss
     assert_eq!(total_received, 10);
 }
+
+#[test]
+fn test_decoded_frame_ordering_and_pts_continuity() {
+    let (sender, receiver) = bounded::<DecodedFrame>(16);
+
+    let frames: Vec<DecodedFrame> = (0..5)
+        .map(|i| DecodedFrame {
+            frame_index: i,
+            timestamp_ms: (i * 40) as i64, // 25 FPS
+            width: 1280,
+            height: 720,
+            rgb_data: vec![128u8; 1280 * 720 * 3],
+            is_keyframe: i == 0,
+        })
+        .collect();
+
+    for f in frames.clone() {
+        sender.send(f).unwrap();
+    }
+    drop(sender);
+
+    let mut prev_ts = -1;
+    let mut count = 0;
+    while let Ok(frame) = receiver.recv() {
+        assert!(frame.timestamp_ms > prev_ts);
+        assert_eq!(frame.frame_index, count);
+        if count == 0 {
+            assert!(frame.is_keyframe);
+        }
+        prev_ts = frame.timestamp_ms;
+        count += 1;
+    }
+    assert_eq!(count, 5);
+}

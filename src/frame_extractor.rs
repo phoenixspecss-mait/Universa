@@ -22,7 +22,6 @@ use ffmpeg_next as ffmpeg;
 use log::{debug, error, info, warn};
 use std::path::Path;
 use std::ptr;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread::{self, JoinHandle};
 use thiserror::Error;
 
@@ -186,7 +185,7 @@ pub struct FrameExtractor {
     hw_active: bool,
     sender: Sender<FramePayload>,
     config: ExtractorConfig,
-    frame_index: AtomicU64,
+    frame_index: u64,
     last_good_pts: i64,
 }
 
@@ -279,7 +278,7 @@ impl FrameExtractor {
             hw_active,
             sender,
             config,
-            frame_index: AtomicU64::new(0),
+            frame_index: 0,
             last_good_pts: 0,
         })
     }
@@ -520,11 +519,14 @@ impl FrameExtractor {
         let dts = pts;
         self.last_good_pts = pts;
 
+        let current_index = self.frame_index;
+        self.frame_index += 1;
+
         let payload = FramePayload {
             rgb: rgb_bytes,
             pts,
             dts,
-            frame_index: self.frame_index.fetch_add(1, Ordering::Relaxed),
+            frame_index: current_index,
             width: w,
             height: h,
             is_keyframe: packet_is_key || sw_frame.is_key(),
@@ -713,5 +715,41 @@ mod tests {
             Err(e) => panic!("Expected CodecError::OpenInput, got: {:?}", e),
             Ok(_) => panic!("Expected error for non-existent file"),
         }
+    }
+
+    #[test]
+    fn test_frame_payload_integrity_and_bounds() {
+        let payload = FramePayload {
+            rgb: vec![255u8; 1920 * 1080 * 3],
+            pts: 33333,
+            dts: 33333,
+            frame_index: 42,
+            width: 1920,
+            height: 1080,
+            is_keyframe: true,
+        };
+
+        assert_eq!(payload.frame_index, 42);
+        assert_eq!(payload.rgb.len(), 1920 * 1080 * 3);
+        assert!(payload.is_keyframe);
+        assert_eq!(payload.pts, 33333);
+        assert_eq!(payload.dts, 33333);
+    }
+
+    #[test]
+    fn test_extractor_config_custom_initialization() {
+        let config = ExtractorConfig {
+            channel_capacity: 128,
+            prefer_hw_accel: false,
+            backpressure: BackpressurePolicy::DropOldest,
+            max_consecutive_errors: 16,
+            max_resolution: Some((1280, 720)),
+        };
+
+        assert_eq!(config.channel_capacity, 128);
+        assert!(!config.prefer_hw_accel);
+        assert_eq!(config.backpressure, BackpressurePolicy::DropOldest);
+        assert_eq!(config.max_consecutive_errors, 16);
+        assert_eq!(config.max_resolution, Some((1280, 720)));
     }
 }

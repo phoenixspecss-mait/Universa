@@ -1,4 +1,5 @@
 #include "file_carver.h"
+#include "constants.h"
 
 #include <fstream>
 #include <vector>
@@ -126,8 +127,8 @@ std::vector<CarvedChunk> FileCarver::carve(const std::string& diskImagePath, con
 
     std::vector<RawMatch> matches;
     std::vector<uint8_t> window;
-    const size_t chunkSize = 65536;
-    const size_t overlapMargin = 32;
+    const size_t chunkSize = universa::CARVER_BUFFER_SIZE;
+    const size_t overlapMargin = universa::CARVER_OVERLAP_MARGIN;
     std::vector<char> readBuffer(chunkSize);
     uint64_t windowBaseOffset = 0;
 
@@ -259,7 +260,7 @@ std::vector<CarvedChunk> FileCarver::carve(const std::string& diskImagePath, con
         std::ofstream outFile(targetFilePath, std::ios::binary);
 
         uint64_t remaining = chunkLen;
-        std::vector<char> transferBuffer(65536);
+        std::vector<char> transferBuffer(universa::CARVER_BUFFER_SIZE);
         while (remaining > 0) {
             size_t toRead = std::min((uint64_t)transferBuffer.size(), remaining);
             in.read(transferBuffer.data(), toRead);

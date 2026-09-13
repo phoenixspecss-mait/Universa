@@ -1,8 +1,10 @@
 #include "custody_log.h"
+#include "constants.h"
 
 #include <fstream>
 #include <sstream>
 #include <iomanip>
+#include <vector>
 #include <chrono>
 #include <ctime>
 #include <openssl/evp.h>
@@ -47,22 +49,21 @@ std::string CustodyLog::computeSha256(const std::string& data) {
     return oss.str();
 }
 
-std::string CustodyLog::computeFileSha256(const std::string& filePath) {
+static std::string evpFileHash(const std::string& filePath, const EVP_MD* md) {
     std::ifstream file(filePath, std::ios::binary);
     if (!file.is_open()) return "";
 
     EVP_MD_CTX* ctx = EVP_MD_CTX_new();
     if (!ctx) return "";
 
-    const EVP_MD* md = EVP_sha256();
     if (EVP_DigestInit_ex(ctx, md, nullptr) != 1) {
         EVP_MD_CTX_free(ctx);
         return "";
     }
 
-    char buffer[65536];
-    while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
-        if (EVP_DigestUpdate(ctx, buffer, file.gcount()) != 1) {
+    std::vector<char> buffer(universa::HASH_BUFFER_SIZE);
+    while (file.read(buffer.data(), buffer.size()) || file.gcount() > 0) {
+        if (EVP_DigestUpdate(ctx, buffer.data(), file.gcount()) != 1) {
             EVP_MD_CTX_free(ctx);
             return "";
         }
@@ -81,6 +82,14 @@ std::string CustodyLog::computeFileSha256(const std::string& filePath) {
         oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[i]);
     }
     return oss.str();
+}
+
+std::string CustodyLog::computeFileSha256(const std::string& filePath) {
+    return evpFileHash(filePath, EVP_sha256());
+}
+
+std::string CustodyLog::computeFileMd5(const std::string& filePath) {
+    return evpFileHash(filePath, EVP_md5());
 }
 
 std::string CustodyLog::escapeJson(const std::string& str) {

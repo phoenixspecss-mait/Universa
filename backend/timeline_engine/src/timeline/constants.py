@@ -1,6 +1,15 @@
 """Domain constants and enumerations for the timeline engine."""
 
-from enum import StrEnum
+try:
+    from enum import StrEnum
+except ImportError:
+    from enum import Enum
+
+    class StrEnum(str, Enum):
+        """Python 3.9/3.10 fallback for StrEnum."""
+        def __str__(self) -> str:
+            return str(self.value)
+
 
 
 class VendorType(StrEnum):

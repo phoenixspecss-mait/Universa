@@ -37,7 +37,7 @@ fn main() -> Result<(), CodecError> {
         total_frames += 1;
         total_bytes += frame.rgb.len();
 
-        if total_frames <= 5 || total_frames.is_multiple_of(50) {
+        if total_frames <= 5 || total_frames % 50 == 0 {
             println!(
                 "[Frame #{}] {}x{} | PTS: {} | Keyframe: {} | Buffer Size: {} KB",
                 frame.frame_index,

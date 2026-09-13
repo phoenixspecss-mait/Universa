@@ -32,12 +32,12 @@ from pathlib import Path
 # Paths
 ROOT_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = ROOT_DIR / "backend"
-SOMETHING_DIR = BACKEND_DIR / "something-main"
+TIMELINE_ENGINE_DIR = BACKEND_DIR / "timeline_engine"
 ML_DIR = BACKEND_DIR / "universa_ml_sih-main"
 CASES_DIR = ROOT_DIR / "cases"
 
 # Inject paths into sys.path
-for p in [ROOT_DIR, SOMETHING_DIR, ML_DIR]:
+for p in [ROOT_DIR, TIMELINE_ENGINE_DIR, ML_DIR]:
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
@@ -238,7 +238,7 @@ def launch_services():
 
     p2 = subprocess.Popen([
         sys.executable, "-m", "uvicorn", "src.main:app",
-        "--app-dir", str(SOMETHING_DIR),
+        "--app-dir", str(TIMELINE_ENGINE_DIR),
         "--host", "0.0.0.0", "--port", "8000"
     ])
     procs.append(p2)

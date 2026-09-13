@@ -7,7 +7,12 @@ auditable clock offset and drift corrections.
 
 import re
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta, timezone
+try:
+    from datetime import UTC, datetime, timedelta, timezone
+except ImportError:
+    from datetime import datetime, timedelta, timezone
+    UTC = timezone.utc
+
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dateutil import parser as dateutil_parser

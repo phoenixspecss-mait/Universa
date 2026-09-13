@@ -1,5 +1,7 @@
 #include "timeline_normalizer.h"
+#include "constants.h"
 
+#include <iostream>
 #include <algorithm>
 #include <ctime>
 #include <cstdio>
@@ -25,7 +27,8 @@ int64_t TimelineNormalizer::parseIso8601ToEpoch(const std::string& isoStr) {
         return timegm(&tm);
 #endif
     }
-    return 1767225600;
+    std::cerr << "[WARN] Malformed timestamp, using fallback\n";
+    return universa::FALLBACK_EPOCH;
 }
 
 std::string TimelineNormalizer::formatEpochToIso8601(int64_t epochSeconds) {

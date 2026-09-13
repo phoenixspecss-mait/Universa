@@ -8,6 +8,7 @@ extern "C" {
 }
 
 #include <exception>
+#include <memory>
 
 ClipValidator::ClipValidator() = default;
 ClipValidator::~ClipValidator() = default;
@@ -22,21 +23,24 @@ ValidationResult ClipValidator::validate(const std::string& filePath) {
     try {
         av_log_set_level(AV_LOG_QUIET);
 
-        AVFormatContext* formatContext = nullptr;
-        int ret = avformat_open_input(&formatContext, filePath.c_str(), nullptr, nullptr);
+        AVFormatContext* rawFmt = nullptr;
+        int ret = avformat_open_input(&rawFmt, filePath.c_str(), nullptr, nullptr);
         if (ret < 0) {
             char err[AV_ERROR_MAX_STRING_SIZE] = {0};
             av_strerror(ret, err, sizeof(err));
             result.error_message = err;
             return result;
         }
+        // RAII: auto-close format context on any exit path
+        auto formatContext = std::shared_ptr<AVFormatContext>(rawFmt, [](AVFormatContext* ctx) {
+            if (ctx) avformat_close_input(&ctx);
+        });
 
-        ret = avformat_find_stream_info(formatContext, nullptr);
+        ret = avformat_find_stream_info(formatContext.get(), nullptr);
         if (ret < 0) {
             char err[AV_ERROR_MAX_STRING_SIZE] = {0};
             av_strerror(ret, err, sizeof(err));
             result.error_message = err;
-            avformat_close_input(&formatContext);
             return result;
         }
 
@@ -51,7 +55,6 @@ ValidationResult ClipValidator::validate(const std::string& filePath) {
 
         if (videoStreamIndex == -1) {
             result.error_message = "No video stream found in container";
-            avformat_close_input(&formatContext);
             return result;
         }
 
@@ -67,53 +70,53 @@ ValidationResult ClipValidator::validate(const std::string& filePath) {
         const AVCodec* decoder = avcodec_find_decoder(codecPar->codec_id);
         if (!decoder) {
             result.error_message = "Unsupported video codec";
-            avformat_close_input(&formatContext);
             return result;
         }
         result.codec_name = decoder->name ? decoder->name : "unknown";
 
-        AVCodecContext* codecContext = avcodec_alloc_context3(decoder);
+        // RAII: auto-free codec context
+        auto codecContext = std::shared_ptr<AVCodecContext>(
+            avcodec_alloc_context3(decoder),
+            [](AVCodecContext* ctx) { if (ctx) avcodec_free_context(&ctx); });
         if (!codecContext) {
             result.error_message = "Failed to allocate codec context";
-            avformat_close_input(&formatContext);
             return result;
         }
 
-        ret = avcodec_parameters_to_context(codecContext, codecPar);
+        ret = avcodec_parameters_to_context(codecContext.get(), codecPar);
         if (ret < 0) {
             char err[AV_ERROR_MAX_STRING_SIZE] = {0};
             av_strerror(ret, err, sizeof(err));
             result.error_message = err;
-            avcodec_free_context(&codecContext);
-            avformat_close_input(&formatContext);
             return result;
         }
 
-        ret = avcodec_open2(codecContext, decoder, nullptr);
+        ret = avcodec_open2(codecContext.get(), decoder, nullptr);
         if (ret < 0) {
             char err[AV_ERROR_MAX_STRING_SIZE] = {0};
             av_strerror(ret, err, sizeof(err));
             result.error_message = err;
-            avcodec_free_context(&codecContext);
-            avformat_close_input(&formatContext);
             return result;
         }
 
-        AVPacket* packet = av_packet_alloc();
-        AVFrame* frame = av_frame_alloc();
+        // RAII: auto-free packet and frame
+        auto packet = std::unique_ptr<AVPacket, void(*)(AVPacket*)>(
+            av_packet_alloc(), [](AVPacket* p){ if(p) av_packet_free(&p); });
+        auto frame = std::unique_ptr<AVFrame, void(*)(AVFrame*)>(
+            av_frame_alloc(), [](AVFrame* f){ if(f) av_frame_free(&f); });
         int decodedFrames = 0;
 
-        while (av_read_frame(formatContext, packet) >= 0) {
+        while (av_read_frame(formatContext.get(), packet.get()) >= 0) {
             if (packet->stream_index == videoStreamIndex) {
-                int sendRet = avcodec_send_packet(codecContext, packet);
+                int sendRet = avcodec_send_packet(codecContext.get(), packet.get());
                 if (sendRet >= 0) {
-                    while (avcodec_receive_frame(codecContext, frame) >= 0) {
+                    while (avcodec_receive_frame(codecContext.get(), frame.get()) >= 0) {
                         decodedFrames++;
                         if (decodedFrames >= 3) break;
                     }
                 }
             }
-            av_packet_unref(packet);
+            av_packet_unref(packet.get());
             if (decodedFrames >= 3) break;
         }
 
@@ -126,10 +129,7 @@ ValidationResult ClipValidator::validate(const std::string& filePath) {
             result.error_message = "Failed to decode any video frames";
         }
 
-        av_frame_free(&frame);
-        av_packet_free(&packet);
-        avcodec_free_context(&codecContext);
-        avformat_close_input(&formatContext);
+        // No manual cleanup needed — RAII handles all resource deallocation
     } catch (const std::exception& e) {
         result.is_valid = false;
         result.error_message = e.what();

@@ -3,6 +3,8 @@
 .DS_Store
 
 # Build artifacts and binaries
+build/
+.cache/
 *.o
 *.so
 *.dylib

@@ -57,10 +57,6 @@ class DashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final casesAsync = ref.watch(casesProvider);
-    final stats = ref.watch(dashboardStatsProvider);
-    final upload = ref.watch(uploadProvider);
-
     return Stack(
       children: [
         RefreshIndicator(
@@ -113,57 +109,8 @@ class DashboardScreen extends ConsumerWidget {
                 ),
               ),
 
-              // 2. Stats row (live)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 24.0),
-                  child: SizedBox(
-                    height: 110,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                      children: [
-                        _StatCard(
-                          label: 'Active Cases',
-                          value: '${stats['activeCases']}',
-                          accentColor: AppColors.primaryNavyLight,
-                          percent: null,
-                        ),
-                        const SizedBox(width: 12),
-                        _StatCard(
-                          label: 'Hash Verified',
-                          value: '${stats['hashVerifiedCases']}',
-                          accentColor: AppColors.emerald,
-                          percent: casesAsync.maybeWhen(
-                            data: (cases) {
-                              if (cases.isEmpty) return null;
-                              return (stats['hashVerifiedCases'] as int) / cases.length;
-                            },
-                            orElse: () => null,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        _StatCard(
-                          label: 'Pending AI Triage',
-                          value: '${stats['pendingAiTriage']}',
-                          accentColor: AppColors.rustAmber,
-                          percent: null,
-                        ),
-                        const SizedBox(width: 12),
-                        _StatCard(
-                          label: 'Total Uploaded',
-                          value: casesAsync.maybeWhen(
-                            data: (cases) => '${cases.length}',
-                            orElse: () => '—',
-                          ),
-                          accentColor: AppColors.tealGreen,
-                          percent: null,
-                        ),
-                      ].animate(interval: 100.ms).fadeIn().scale(),
-                    ),
-                  ),
-                ),
-              ),
+              // 2. Fine-grained Stats row (only rebuilds when stats change)
+              const _DashboardStatsSliver(),
 
               // 3. Live AI Feed
               SliverToBoxAdapter(
@@ -208,58 +155,16 @@ class DashboardScreen extends ConsumerWidget {
                 ),
               ),
 
-              // 4. Cases section header
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Cases',
-                        style: AppTypography.headlineSmall.copyWith(color: AppColors.textPrimary),
-                      ),
-                      const SizedBox(width: 12),
-                      casesAsync.when(
-                        data: (cases) => _CountBadge(count: cases.length),
-                        loading: () => const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.electricCyan)),
-                        error: (_, __) => const SizedBox.shrink(),
-                      ),
-                      const Spacer(),
-                      // Refresh button
-                      GestureDetector(
-                        onTap: () => ref.invalidate(casesProvider),
-                        child: const Icon(Icons.refresh, color: AppColors.textMuted, size: 18),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              // 4. Cases section header (only watches cases count)
+              const _CasesHeaderSliver(),
 
-              // 5. Cases list
-              casesAsync.when(
-                data: (cases) => cases.isEmpty
-                    ? SliverToBoxAdapter(child: _buildEmptyState(context))
-                    : SliverList.builder(
-                        itemCount: cases.length,
-                        itemBuilder: (context, index) {
-                          final caseItem = cases[index];
-                          return _CaseListItem(
-                            caseItem: caseItem,
-                            index: index,
-                            statusType: _mapCaseStatus(caseItem.status),
-                            statusLabel: _mapCaseStatusLabel(caseItem.status),
-                            relativeTime: _relativeTime(caseItem.lastUpdated),
-                            onTap: () => context.push('/report/${caseItem.id}'),
-                          );
-                        },
-                      ),
-                loading: () => SliverList.builder(
-                  itemCount: 4,
-                  itemBuilder: (_, i) => const _SkeletonCaseCard(),
-                ),
-                error: (err, _) => SliverToBoxAdapter(
-                  child: _buildErrorState(context, err.toString(), () => ref.invalidate(casesProvider)),
-                ),
+              // 5. Cases list (only rebuilds when case list changes)
+              _CasesListSliver(
+                mapCaseStatus: _mapCaseStatus,
+                mapCaseStatusLabel: _mapCaseStatusLabel,
+                relativeTime: _relativeTime,
+                buildEmptyState: _buildEmptyState,
+                buildErrorState: _buildErrorState,
               ),
 
               const SliverToBoxAdapter(child: SizedBox(height: 100)),
@@ -267,35 +172,11 @@ class DashboardScreen extends ConsumerWidget {
           ),
         ),
 
-        // Upload progress overlay
-        if (upload.status == UploadStatus.uploading)
-          Positioned(
-            bottom: 90,
-            left: 16,
-            right: 16,
-            child: _UploadProgressBanner(progress: upload.progress),
-          ),
+        // 6. Isolated Upload progress overlay (does NOT trigger dashboard rebuild)
+        const _DashboardUploadOverlay(),
 
-        // FAB
-        Positioned(
-          bottom: 24,
-          right: 20,
-          child: FloatingActionButton.extended(
-            backgroundColor: AppColors.electricCyan,
-            foregroundColor: AppColors.background,
-            icon: const Icon(Icons.upload_file),
-            label: Text(
-              'New Case',
-              style: AppTypography.labelSmall.copyWith(
-                color: AppColors.background,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            onPressed: upload.status == UploadStatus.uploading
-                ? null
-                : () => _showUploadSheet(context, ref),
-          ).animate().scale(delay: 300.ms),
-        ),
+        // 7. Isolated FAB
+        _DashboardNewCaseFab(onTap: () => _showUploadSheet(context, ref)),
       ],
     );
   }
@@ -418,6 +299,192 @@ class DashboardScreen extends ConsumerWidget {
       );
     }
     notifier.reset();
+  }
+}
+
+class _DashboardStatsSliver extends ConsumerWidget {
+  const _DashboardStatsSliver();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final stats = ref.watch(dashboardStatsProvider);
+    final verifiedCasesCount = ref.watch(casesProvider.select((c) => c.value?.length ?? 0));
+
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 24.0),
+        child: SizedBox(
+          height: 110,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            children: [
+              _StatCard(
+                label: 'Active Cases',
+                value: '${stats['activeCases']}',
+                accentColor: AppColors.primaryNavyLight,
+                percent: null,
+              ),
+              const SizedBox(width: 12),
+              _StatCard(
+                label: 'Hash Verified',
+                value: '${stats['hashVerifiedCases']}',
+                accentColor: AppColors.emerald,
+                percent: verifiedCasesCount > 0
+                    ? ((stats['hashVerifiedCases'] as int? ?? 0) / verifiedCasesCount)
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              _StatCard(
+                label: 'Pending AI Triage',
+                value: '${stats['pendingAiTriage']}',
+                accentColor: AppColors.rustAmber,
+                percent: null,
+              ),
+              const SizedBox(width: 12),
+              _StatCard(
+                label: 'Total Uploaded',
+                value: '$verifiedCasesCount',
+                accentColor: AppColors.tealGreen,
+                percent: null,
+              ),
+            ].animate(interval: 100.ms).fadeIn().scale(),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CasesHeaderSliver extends ConsumerWidget {
+  const _CasesHeaderSliver();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final casesAsync = ref.watch(casesProvider);
+
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        child: Row(
+          children: [
+            Text(
+              'Cases',
+              style: AppTypography.headlineSmall.copyWith(color: AppColors.textPrimary),
+            ),
+            const SizedBox(width: 12),
+            casesAsync.when(
+              data: (cases) => _CountBadge(count: cases.length),
+              loading: () => const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.electricCyan),
+              ),
+              error: (_, __) => const SizedBox.shrink(),
+            ),
+            const Spacer(),
+            GestureDetector(
+              onTap: () => ref.invalidate(casesProvider),
+              child: const Icon(Icons.refresh, color: AppColors.textMuted, size: 18),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CasesListSliver extends ConsumerWidget {
+  final StatusType Function(CaseStatus) mapCaseStatus;
+  final String Function(CaseStatus) mapCaseStatusLabel;
+  final String Function(DateTime) relativeTime;
+  final Widget Function(BuildContext) buildEmptyState;
+  final Widget Function(BuildContext, String, VoidCallback) buildErrorState;
+
+  const _CasesListSliver({
+    required this.mapCaseStatus,
+    required this.mapCaseStatusLabel,
+    required this.relativeTime,
+    required this.buildEmptyState,
+    required this.buildErrorState,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final casesAsync = ref.watch(casesProvider);
+
+    return casesAsync.when(
+      data: (cases) => cases.isEmpty
+          ? SliverToBoxAdapter(child: buildEmptyState(context))
+          : SliverList.builder(
+              itemCount: cases.length,
+              itemBuilder: (context, index) {
+                final caseItem = cases[index];
+                return _CaseListItem(
+                  caseItem: caseItem,
+                  index: index,
+                  statusType: mapCaseStatus(caseItem.status),
+                  statusLabel: mapCaseStatusLabel(caseItem.status),
+                  relativeTime: relativeTime(caseItem.lastUpdated),
+                  onTap: () => context.push('/report/${caseItem.id}'),
+                );
+              },
+            ),
+      loading: () => SliverList.builder(
+        itemCount: 4,
+        itemBuilder: (_, i) => const _SkeletonCaseCard(),
+      ),
+      error: (err, _) => SliverToBoxAdapter(
+        child: buildErrorState(context, err.toString(), () => ref.invalidate(casesProvider)),
+      ),
+    );
+  }
+}
+
+class _DashboardUploadOverlay extends ConsumerWidget {
+  const _DashboardUploadOverlay();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isUploading = ref.watch(uploadProvider.select((u) => u.status == UploadStatus.uploading));
+    final progress = ref.watch(uploadProvider.select((u) => u.progress));
+
+    if (!isUploading) return const SizedBox.shrink();
+
+    return Positioned(
+      bottom: 90,
+      left: 16,
+      right: 16,
+      child: _UploadProgressBanner(progress: progress),
+    );
+  }
+}
+
+class _DashboardNewCaseFab extends ConsumerWidget {
+  final VoidCallback onTap;
+  const _DashboardNewCaseFab({required this.onTap});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isUploading = ref.watch(uploadProvider.select((u) => u.status == UploadStatus.uploading));
+
+    return Positioned(
+      bottom: 24,
+      right: 20,
+      child: FloatingActionButton.extended(
+        backgroundColor: AppColors.electricCyan,
+        foregroundColor: AppColors.background,
+        icon: const Icon(Icons.upload_file),
+        label: Text(
+          'New Case',
+          style: AppTypography.labelSmall.copyWith(
+            color: AppColors.background,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        onPressed: isUploading ? null : onTap,
+      ).animate().scale(delay: 300.ms),
+    );
   }
 }
 

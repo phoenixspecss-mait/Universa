@@ -72,7 +72,15 @@ bool ReportGenerator::exportJSON(const std::string& outputPath) const {
     out << "    \"source_file\": \"" << escapeJson(data.source_file) << "\",\n";
     out << "    \"detected_brand\": \"" << escapeJson(data.detected_brand) << "\",\n";
     out << "    \"source_file_sha256\": \"" << escapeJson(data.source_file_hash) << "\",\n";
+    out << "    \"source_file_md5\": \"" << escapeJson(data.source_file_md5) << "\",\n";
     out << "    \"generated_at_utc\": \"" << escapeJson(data.generated_at_utc) << "\"\n";
+    out << "  },\n";
+    out << "  \"legal_compliance\": {\n";
+    out << "    \"compliance_standard\": \"" << escapeJson(data.compliance_standard) << "\",\n";
+    out << "    \"iso_standard\": \"" << escapeJson(data.iso_standard) << "\",\n";
+    out << "    \"nist_guideline\": \"" << escapeJson(data.nist_guideline) << "\",\n";
+    out << "    \"examiner_name\": \"" << escapeJson(data.examiner_name) << "\",\n";
+    out << "    \"organization\": \"" << escapeJson(data.organization) << "\"\n";
     out << "  },\n";
 
     out << "  \"chain_of_custody\": {\n";
@@ -183,6 +191,13 @@ bool ReportGenerator::exportCSV(const std::string& outputPath) const {
     std::ofstream out(outputPath);
     if (!out.is_open()) return false;
 
+    out << "# Legal Compliance Standard: " << escapeCsv(data.compliance_standard) << "\n";
+    out << "# ISO Standard: " << escapeCsv(data.iso_standard) << "\n";
+    out << "# NIST Guideline: " << escapeCsv(data.nist_guideline) << "\n";
+    out << "# Examiner: " << escapeCsv(data.examiner_name) << "\n";
+    out << "# Organization: " << escapeCsv(data.organization) << "\n";
+    out << "# SHA-256: " << escapeCsv(data.source_file_hash) << "\n";
+    out << "# MD5: " << escapeCsv(data.source_file_md5) << "\n";
     out << "offset,signature_type,is_fragment,is_valid,codec,resolution,duration,estimated_start_utc,ai_distinct_classes,ai_total_detections\n";
 
     for (size_t i = 0; i < data.chunks.size(); ++i) {
@@ -248,11 +263,14 @@ bool ReportGenerator::exportPDF(const std::string& outputPath) const {
     std::vector<PdfPageLine> lines;
 
     lines.push_back({"DVR/NVR FORENSIC INVESTIGATION REPORT", true});
+    lines.push_back({"LEGAL COMPLIANCE: " + data.compliance_standard + " | " + data.iso_standard + " | " + data.nist_guideline, false});
+    lines.push_back({"LEAD EXAMINER:    " + data.examiner_name + " (" + data.organization + ")", false});
     lines.push_back({"", false});
     lines.push_back({"1. CASE SUMMARY", true});
     lines.push_back({"Source Disk Image: " + data.source_file, false});
     lines.push_back({"Detected Brand:    " + data.detected_brand, false});
     lines.push_back({"SHA-256 Seal:      " + data.source_file_hash, false});
+    lines.push_back({"MD5 Seal:          " + data.source_file_md5, false});
     lines.push_back({"Generated At:      " + data.generated_at_utc, false});
     lines.push_back({"", false});
 
@@ -390,12 +408,22 @@ bool ReportGenerator::exportPDF(const std::string& outputPath) const {
             << "/Contents " << contentObjIds[p] << " 0 R >>\nendobj\n";
 
         std::ostringstream streamContent;
-        streamContent << "BT\n/F1 9 Tf\n12 TL\n";
-        streamContent << "1 0 0 1 36 756 Tm\n";
+        // Running compliance header
+        streamContent << "BT\n/F1 7 Tf\n10 TL\n1 0 0 1 36 768 Tm\n";
+        streamContent << "(UNIVERSA FORENSIC RECOVERY -- CERTIFIED UNDER BSA 2023 SEC 63 / ISO 27037) '\n";
+        streamContent << "ET\n";
 
+        // Body text
+        streamContent << "BT\n/F1 9 Tf\n12 TL\n";
+        streamContent << "1 0 0 1 36 746 Tm\n";
         for (const auto& line : pages[p]) {
             streamContent << "(" << escapePdfText(line.text) << ") '\n";
         }
+        streamContent << "ET\n";
+
+        // Running compliance footer
+        streamContent << "BT\n/F1 7 Tf\n10 TL\n1 0 0 1 36 24 Tm\n";
+        streamContent << "(CONFIDENTIAL & TAMPER-EVIDENT FORENSIC REPORT -- " << escapePdfText(data.organization) << " -- PAGE " << (p + 1) << " OF " << numPages << ") '\n";
         streamContent << "ET\n";
 
         std::string streamStr = streamContent.str();

@@ -8,9 +8,27 @@ import 'package:universa/data/models/search_result_model.dart';
 
 /// HTTP client for UNIVERSA C++ backend (port 8080) and Timeline/ML Engine (port 8000).
 class ApiClient {
+  static const _defaultTimeout = Duration(seconds: 10);
+  static const _uploadTimeout = Duration(minutes: 5);
+  static const _downloadTimeout = Duration(seconds: 15);
+  static const _quickTimeout = Duration(seconds: 8);
+  static const _probeTimeout = Duration(seconds: 5);
+
   ApiClient({String? baseUrl, String? timelineBaseUrl})
-      : _base = Uri.parse(baseUrl ?? 'http://localhost:8080'),
-        _timelineBase = Uri.parse(timelineBaseUrl ?? 'http://localhost:8000/api/v1');
+      : _base = Uri.parse(
+          baseUrl ??
+              const String.fromEnvironment(
+                'API_URL',
+                defaultValue: 'http://localhost:8080',
+              ),
+        ),
+        _timelineBase = Uri.parse(
+          timelineBaseUrl ??
+              const String.fromEnvironment(
+                'TIMELINE_API_URL',
+                defaultValue: 'http://localhost:8000/api/v1',
+              ),
+        );
 
   final Uri _base;
   final Uri _timelineBase;
@@ -21,7 +39,7 @@ class ApiClient {
   /// Returns all processed cases from `GET /api/cases`.
   Future<List<CaseModel>> fetchCases() async {
     final uri = _base.replace(path: '/api/cases');
-    final response = await _client.get(uri).timeout(const Duration(seconds: 10));
+    final response = await _client.get(uri).timeout(_defaultTimeout);
     _assertOk(response, uri);
     final list = jsonDecode(response.body) as List<dynamic>;
     return list
@@ -34,7 +52,7 @@ class ApiClient {
   /// Returns the full forensic report for a case from `GET /api/cases/:id/report.json`.
   Future<ReportModel> fetchReport(String caseId) async {
     final uri = _base.replace(path: '/api/cases/$caseId/report.json');
-    final response = await _client.get(uri).timeout(const Duration(seconds: 10));
+    final response = await _client.get(uri).timeout(_defaultTimeout);
     _assertOk(response, uri);
     final map = jsonDecode(response.body) as Map<String, dynamic>;
     return ReportModel.fromJson(map);
@@ -45,7 +63,7 @@ class ApiClient {
   /// Returns the AI detection summary from `GET /api/cases/:id/ai_summary`.
   Future<List<AiDetectionModel>> fetchAiSummary(String caseId) async {
     final uri = _base.replace(path: '/api/cases/$caseId/ai_summary');
-    final response = await _client.get(uri).timeout(const Duration(seconds: 10));
+    final response = await _client.get(uri).timeout(_defaultTimeout);
     if (response.statusCode == 404) return [];
     _assertOk(response, uri);
     final list = jsonDecode(response.body) as List<dynamic>;
@@ -59,7 +77,7 @@ class ApiClient {
   /// Fetches the PDF export bytes for a case.
   Future<List<int>> fetchReportPdf(String caseId) async {
     final uri = _base.replace(path: '/api/cases/$caseId/report.pdf');
-    final response = await _client.get(uri).timeout(const Duration(seconds: 15));
+    final response = await _client.get(uri).timeout(_downloadTimeout);
     _assertOk(response, uri);
     return response.bodyBytes;
   }
@@ -67,7 +85,7 @@ class ApiClient {
   /// Fetches the JSON export string for a case.
   Future<String> fetchReportJson(String caseId) async {
     final uri = _base.replace(path: '/api/cases/$caseId/report.json');
-    final response = await _client.get(uri).timeout(const Duration(seconds: 10));
+    final response = await _client.get(uri).timeout(_defaultTimeout);
     _assertOk(response, uri);
     return response.body;
   }
@@ -94,7 +112,7 @@ class ApiClient {
               'top_k': topK,
             }),
           )
-          .timeout(const Duration(seconds: 8));
+          .timeout(_quickTimeout);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final list = jsonDecode(response.body) as List<dynamic>;
@@ -112,7 +130,7 @@ class ApiClient {
         path: '/api/search',
         queryParameters: {'q': query},
       );
-      final response = await _client.get(uri).timeout(const Duration(seconds: 5));
+      final response = await _client.get(uri).timeout(_probeTimeout);
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final list = jsonDecode(response.body) as List<dynamic>;
         return list
@@ -128,7 +146,7 @@ class ApiClient {
   Future<Map<String, dynamic>> fetchTimeline(String caseId) async {
     try {
       final uri = _timelineBase.replace(path: '/api/v1/timeline/$caseId');
-      final response = await _client.get(uri).timeout(const Duration(seconds: 10));
+      final response = await _client.get(uri).timeout(_defaultTimeout);
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       }
@@ -136,7 +154,7 @@ class ApiClient {
       // Try C++ server proxy
       try {
         final uri = _base.replace(path: '/api/cases/$caseId/timeline');
-        final response = await _client.get(uri).timeout(const Duration(seconds: 5));
+        final response = await _client.get(uri).timeout(_probeTimeout);
         if (response.statusCode == 200) {
           return jsonDecode(response.body) as Map<String, dynamic>;
         }
@@ -149,7 +167,7 @@ class ApiClient {
   Future<List<dynamic>> fetchCorrelations(String caseId) async {
     try {
       final uri = _timelineBase.replace(path: '/api/v1/correlations/$caseId');
-      final response = await _client.get(uri).timeout(const Duration(seconds: 8));
+      final response = await _client.get(uri).timeout(_quickTimeout);
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as List<dynamic>;
       }
@@ -161,7 +179,7 @@ class ApiClient {
   Future<Map<String, dynamic>> fetchPipelineStatus() async {
     try {
       final uri = _timelineBase.replace(path: '/api/v1/pipeline/status');
-      final response = await _client.get(uri).timeout(const Duration(seconds: 5));
+      final response = await _client.get(uri).timeout(_probeTimeout);
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       }
@@ -190,7 +208,7 @@ class ApiClient {
     ));
 
     onProgress?.call(0, total);
-    final streamed = await _client.send(request).timeout(const Duration(minutes: 5));
+    final streamed = await _client.send(request).timeout(_uploadTimeout);
     onProgress?.call(total, total);
 
     final response = await http.Response.fromStream(streamed);

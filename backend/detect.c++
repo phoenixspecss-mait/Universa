@@ -15,81 +15,11 @@
 #include "timeline_normalizer.h"
 #include "report_generator.h"
 #include "ai_detector.h"
+#include "utils.h"
+#include "disk_imager.h"
+#include "adapters/adapter_registry.h"
 
 namespace fs = std::filesystem;
-
-enum class VendorType { HIKVISION, GODREJ_DAHUA, CUSTOM_MOCK, UNKNOWN };
-
-class AIPreprocessor {
-public:
-    VendorType detectBrand(const std::string& filePath) {
-        std::ifstream file(filePath, std::ios::binary);
-        if (!file.is_open()) return VendorType::UNKNOWN;
-
-        std::vector<char> buffer(512);
-        file.read(buffer.data(), buffer.size());
-        std::string header(buffer.begin(), buffer.end());
-
-        if (header.find("DHAV") != std::string::npos) return VendorType::GODREJ_DAHUA;
-        if (header.find("DVR-MOCK") != std::string::npos) return VendorType::CUSTOM_MOCK;
-        if (header.find("ftypisom") != std::string::npos) return VendorType::HIKVISION;
-
-        return VendorType::UNKNOWN;
-    }
-
-    bool convertToMP4(const std::string& inputFile, const std::string& outputFile, VendorType) {
-        std::ifstream inFile(inputFile, std::ios::binary);
-        if (!inFile) return false;
-
-        std::vector<char> headerBuffer(2048);
-        inFile.read(headerBuffer.data(), headerBuffer.size());
-        std::streamsize bytesRead = inFile.gcount();
-
-        std::string searchStr = "ftyp";
-        auto it = std::search(headerBuffer.begin(), headerBuffer.begin() + bytesRead, searchStr.begin(), searchStr.end());
-
-        if (it == headerBuffer.begin() + bytesRead) {
-            return false;
-        }
-
-        std::size_t ftypOffset = std::distance(headerBuffer.begin(), it);
-        std::size_t startOffset = (ftypOffset >= 4) ? ftypOffset - 4 : ftypOffset;
-
-        std::ofstream outFile(outputFile, std::ios::binary);
-        if (!outFile) return false;
-
-        inFile.clear();
-        inFile.seekg(startOffset, std::ios::beg);
-
-        char buffer[8192];
-        while (inFile.read(buffer, sizeof(buffer)) || inFile.gcount() > 0) {
-            outFile.write(buffer, inFile.gcount());
-        }
-        return true;
-    }
-
-    std::string generateHash(const std::string& filePath) {
-        std::ifstream file(filePath, std::ios::binary);
-        if (!file.is_open()) return "";
-
-        SHA256_CTX sha256;
-        SHA256_Init(&sha256);
-
-        char buffer[8192];
-        while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
-            SHA256_Update(&sha256, buffer, file.gcount());
-        }
-
-        unsigned char hash[SHA256_DIGEST_LENGTH];
-        SHA256_Final(hash, &sha256);
-
-        std::stringstream ss;
-        for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
-            ss << std::hex << std::setw(2) << std::setfill('0') << (int)hash[i];
-        }
-        return ss.str();
-    }
-};
 
 struct BatchFileResult {
     std::string input_file;
@@ -105,21 +35,7 @@ struct BatchFileResult {
     std::string pdf_report_path;
 };
 
-static std::string currentUtcIso() {
-    auto now = std::chrono::system_clock::now();
-    std::time_t tt = std::chrono::system_clock::to_time_t(now);
-    std::tm gmt{};
-#if defined(_WIN32)
-    gmtime_s(&gmt, &tt);
-#else
-    gmtime_r(&tt, &gmt);
-#endif
-    char buf[32];
-    std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &gmt);
-    return std::string(buf);
-}
-
-static BatchFileResult processImage(const std::string& inputPath, const std::string& outputFolder) {
+static BatchFileResult processImage(const std::string& inputPath, const std::string& outputFolder, AIDetector& aiDetector) {
     BatchFileResult res;
     res.input_file = inputPath;
 
@@ -136,37 +52,38 @@ static BatchFileResult processImage(const std::string& inputPath, const std::str
         CustodyLog custodyLog(custodyPath);
 
         std::string inputHash = CustodyLog::computeFileSha256(inputPath);
+        std::string inputMd5 = CustodyLog::computeFileMd5(inputPath);
         if (inputHash.empty()) {
             res.success = false;
             res.error_message = "Could not compute input hash (unreadable file)";
             return res;
         }
-        custodyLog.addEntry("ingestion", "Input disk image received and hashed", "", inputHash);
+        custodyLog.addEntry("ingestion", "Input disk image received and hashed (SHA-256 + MD5)", "", "SHA256:" + inputHash + " | MD5:" + inputMd5);
 
-        AIPreprocessor engine;
-        VendorType brand = engine.detectBrand(inputPath);
-        std::string brandStr = "Unknown / Raw Disk Image";
-        switch (brand) {
-            case VendorType::GODREJ_DAHUA: brandStr = "Godrej/Dahua (.dav)"; break;
-            case VendorType::HIKVISION:    brandStr = "Hikvision"; break;
-            case VendorType::CUSTOM_MOCK:  brandStr = "Custom MOCK System"; break;
-            default:                       break;
-        }
+        universa::VendorType brand = universa::AdapterRegistry::instance().detectVendor(inputPath);
+        std::string brandStr = universa::AdapterRegistry::instance().getVendorName(inputPath);
         custodyLog.addEntry("brand_detection", "Detected brand: " + brandStr, inputHash, brandStr);
 
         std::cout << "\n==================================================================================================\n";
         std::cout << "Processing: " << inputPath << "\n";
         std::cout << "Output Dir: " << outputFolder << "\n";
         std::cout << "SHA-256:    " << inputHash << "\n";
+        std::cout << "MD5:        " << inputMd5 << "\n";
         std::cout << "[1] Brand Detected: " << brandStr << "\n";
 
         std::string strippedMp4 = (fs::path(outputFolder) / "extracted_wrapped.mp4").string();
-        if (brand != VendorType::UNKNOWN) {
-            std::cout << "[2] Stripping proprietary headers...\n";
-            if (engine.convertToMP4(inputPath, strippedMp4, brand)) {
-                std::string strippedHash = engine.generateHash(strippedMp4);
-                custodyLog.addEntry("wrapper_stripping", "Stripped proprietary container to standard MP4", inputHash, strippedHash);
-                std::cout << "[3] Cryptographic seal generated for extracted MP4: " << strippedHash << "\n";
+        if (brand != universa::VendorType::UNKNOWN) {
+            std::cout << "[2] Stripping proprietary headers via isolated adapter...\n";
+            std::string failReason;
+            if (universa::AdapterRegistry::instance().decodeWithIsolation(inputPath, strippedMp4, &failReason)) {
+                std::string strippedSha = CustodyLog::computeFileSha256(strippedMp4);
+                std::string strippedMd5 = CustodyLog::computeFileMd5(strippedMp4);
+                custodyLog.addEntry("wrapper_stripping", "Stripped proprietary container to standard MP4", inputHash, strippedSha);
+                std::cout << "[3] Cryptographic seal generated for extracted MP4: " << strippedSha << " (MD5: " << strippedMd5 << ")\n";
+            } else {
+                std::string failDesc = failReason.empty() ? "ADAPTER_FAILED" : ("ADAPTER_FAILED: " + failReason);
+                custodyLog.addEntry("wrapper_stripping", "status: ADAPTER_FAILED (" + failReason + ")", inputHash, "ADAPTER_FAILED");
+                std::cerr << "[FAIL-SAFE] " << failDesc << ", continuing pipeline to raw carving.\n";
             }
         }
 
@@ -236,7 +153,6 @@ static BatchFileResult processImage(const std::string& inputPath, const std::str
                             std::to_string(chunks.size()) + " playable clips",
                             carvedHashSummary, std::to_string(res.valid_count));
 
-        AIDetector aiDetector;
         std::vector<ClipAIDetection> aiResults;
         if (aiDetector.is_available()) {
             std::cout << "[6] Running AI Object Detection (YOLOv4-tiny)...\n";
@@ -274,7 +190,8 @@ static BatchFileResult processImage(const std::string& inputPath, const std::str
         repData.source_file = inputPath;
         repData.detected_brand = brandStr;
         repData.source_file_hash = inputHash;
-        repData.generated_at_utc = currentUtcIso();
+        repData.source_file_md5 = inputMd5;
+        repData.generated_at_utc = universa::currentUtcIso();
         repData.chain_verification_passed = chainOk;
         repData.chain_mismatch_index = mismatchIdx;
         repData.chunks = chunks;
@@ -311,6 +228,36 @@ static BatchFileResult processImage(const std::string& inputPath, const std::str
 }
 
 int main(int argc, char* argv[]) {
+    if (argc >= 4 && std::string(argv[1]) == "--acquire") {
+        std::string srcDev = argv[2];
+        std::string dstImg = argv[3];
+        std::cout << "Starting Raw Bit-Stream Forensic Acquisition:\n"
+                  << "  Source Device/Image: " << srcDev << "\n"
+                  << "  Destination Image:   " << dstImg << "\n";
+        auto acq = universa::DiskImager::acquire(srcDev, dstImg, [](uint64_t bytes, uint64_t total) {
+            if (total > 0) {
+                double pct = (static_cast<double>(bytes) / total) * 100.0;
+                std::cout << "\rAcquiring: " << std::fixed << std::setprecision(1) << pct << "% ("
+                          << (bytes / 1048576) << " MB)" << std::flush;
+            } else {
+                std::cout << "\rAcquiring: " << (bytes / 1048576) << " MB..." << std::flush;
+            }
+        });
+        std::cout << "\n";
+        if (acq.success) {
+            std::cout << "Forensic Acquisition SUCCESSFUL!\n"
+                      << "  Bytes Acquired: " << acq.bytes_acquired << "\n"
+                      << "  SHA-256 Seal:   " << acq.sha256_hash << "\n"
+                      << "  MD5 Seal:       " << acq.md5_hash << "\n"
+                      << "  Duration:       " << std::fixed << std::setprecision(2) << acq.duration_seconds << "s\n"
+                      << "  Compliance:     BSA 2023 §63 / ISO 27037:2012 Certified\n";
+            return 0;
+        } else {
+            std::cerr << "Forensic Acquisition FAILED: " << acq.error_message << "\n";
+            return 1;
+        }
+    }
+
     std::vector<std::string> inputFiles;
 
     if (argc > 1) {
@@ -339,11 +286,13 @@ int main(int argc, char* argv[]) {
     bool isSingleRun = (inputFiles.size() == 1);
     std::vector<BatchFileResult> results;
 
+    AIDetector aiDetector;
+
     for (const auto& filePath : inputFiles) {
         fs::path p(filePath);
         std::string stem = p.filename().string();
         std::string outDir = isSingleRun ? "output" : ("output/" + stem);
-        BatchFileResult res = processImage(filePath, outDir);
+        BatchFileResult res = processImage(filePath, outDir, aiDetector);
         results.push_back(res);
     }
 

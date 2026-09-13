@@ -5,8 +5,33 @@
 #include <set>
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 namespace fs = std::filesystem;
+
+static std::string resolveModelPath(const std::string& explicitPath, const char* envVar, const std::string& defaultSubpath) {
+    if (const char* env = std::getenv(envVar)) {
+        if (fs::exists(env)) return std::string(env);
+    }
+    if (const char* dir = std::getenv("UNIVERSA_MODELS_DIR")) {
+        fs::path p = fs::path(dir) / defaultSubpath;
+        if (fs::exists(p)) return p.string();
+    }
+    if (fs::exists(explicitPath)) {
+        return explicitPath;
+    }
+    // Fallback relative paths
+    std::vector<std::string> searchPaths = {
+        defaultSubpath,
+        "backend/" + defaultSubpath,
+        "../" + defaultSubpath,
+        "../../" + defaultSubpath
+    };
+    for (const auto& sp : searchPaths) {
+        if (fs::exists(sp)) return sp;
+    }
+    return explicitPath;
+}
 
 AIDetector::AIDetector(const std::string& cfgPath,
                        const std::string& weightsPath,
@@ -19,16 +44,20 @@ AIDetector::AIDetector(const std::string& cfgPath,
       sampleInterval(sampleIntervalSeconds) {
 
 #ifdef ENABLE_AI_DETECTION
-    if (!fs::exists(cfgPath) || !fs::exists(weightsPath) || !fs::exists(namesPath)) {
-        std::cout << "AI model not found at " << weightsPath << ", skipping detection\n";
+    std::string actualCfg = resolveModelPath(cfgPath, "UNIVERSA_YOLO_CFG", "models/yolov4-tiny.cfg");
+    std::string actualWeights = resolveModelPath(weightsPath, "UNIVERSA_YOLO_WEIGHTS", "models/yolov4-tiny.weights");
+    std::string actualNames = resolveModelPath(namesPath, "UNIVERSA_YOLO_NAMES", "models/coco.names");
+
+    if (!fs::exists(actualCfg) || !fs::exists(actualWeights) || !fs::exists(actualNames)) {
+        std::cout << "AI model not found at " << actualWeights << ", skipping detection\n";
         available = false;
         return;
     }
 
     try {
-        std::ifstream ifs(namesPath);
+        std::ifstream ifs(actualNames);
         if (!ifs.is_open()) {
-            std::cout << "AI model not found at " << namesPath << ", skipping detection\n";
+            std::cout << "AI model not found at " << actualNames << ", skipping detection\n";
             available = false;
             return;
         }
@@ -42,9 +71,9 @@ AIDetector::AIDetector(const std::string& cfgPath,
             }
         }
 
-        net = cv::dnn::readNetFromDarknet(cfgPath, weightsPath);
+        net = cv::dnn::readNetFromDarknet(actualCfg, actualWeights);
         if (net.empty()) {
-            std::cout << "AI model failed to load from " << weightsPath << ", skipping detection\n";
+            std::cout << "AI model failed to load from " << actualWeights << ", skipping detection\n";
             available = false;
             return;
         }
