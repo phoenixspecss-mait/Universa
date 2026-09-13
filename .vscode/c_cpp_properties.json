@@ -1,0 +1,27 @@
+{
+  "configurations": [
+    {
+      "name": "Mac",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "${workspaceFolder}/backend",
+        "${workspaceFolder}/backend/api",
+        "/opt/homebrew/opt/openssl/include",
+        "/opt/homebrew/opt/ffmpeg/include",
+        "/opt/homebrew/opt/opencv/include/opencv4",
+        "/opt/homebrew/include"
+      ],
+      "defines": [],
+      "defines": [
+        "ENABLE_AI_DETECTION"
+      ],
+      "compilerPath": "/usr/bin/clang++",
+      "cStandard": "c17",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "macos-clang-arm64",
+      "compileCommands": "${workspaceFolder}/compile_commands.json"
+    }
+  ],
+  "version": 4
+}
+

@@ -1,0 +1,38 @@
+# Compiled binaries
+dvr_recovery
+dvr_api_server
+synthetic_image_builder
+
+# Object files and libraries
+*.o
+backend/*.o
+backend/api/*.o
+*.a
+*.so
+*.dylib
+*.dSYM/
+
+# Build directories
+build/
+test_build/
+cmake-build-*/
+
+# Output evidence and test cases
+output/
+cases/
+carved_output/
+*.img
+*.bin
+*.raw
+*.dd
+*.dvr
+*.dav
+synthetic_disk.img
+
+# Pretrained AI models (downloaded via backend/models/download_models.sh)
+/models/
+
+# macOS / Editor artifacts
+.DS_Store
+*.swp
+*~

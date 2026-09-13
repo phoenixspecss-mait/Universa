@@ -1,0 +1,8 @@
+-std=c++17
+-Ibackend
+-Ibackend/api
+-I/opt/homebrew/opt/openssl/include
+-I/opt/homebrew/opt/ffmpeg/include
+-I/opt/homebrew/opt/opencv/include/opencv4
+-DENABLE_AI_DETECTION
+-Wno-deprecated-declarations
