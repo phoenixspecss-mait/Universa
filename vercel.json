@@ -1,0 +1,11 @@
+{
+  "buildCommand": "cd frontend && $HOME/flutter/bin/flutter build web --release",
+  "outputDirectory": "frontend/build/web",
+  "installCommand": "git clone https://github.com/flutter/flutter.git --depth 1 -b stable $HOME/flutter",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
